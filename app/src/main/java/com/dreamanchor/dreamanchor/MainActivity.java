@@ -1,12 +1,16 @@
 package com.dreamanchor.dreamanchor;
 
+import android.app.Dialog;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.webkit.WebView;
+import android.widget.Button;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -92,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
                         imageUrls.add(payload.svg);
                     }
 
-                    updateWebView(imageUrls);
+                    updateImageWebView(imageUrls);
                 }
 
                 @Override
@@ -102,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
                     Svg svg = new Svg();
                     svg.url = "https://openclipart.org/download/248394/1463055000.svg";
                     imageUrls.add(svg);
-                    updateWebView(imageUrls);
+                    updateImageWebView(imageUrls);
                 }
             });
 
@@ -111,7 +115,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void updateWebView(List<Svg> images) {
+
+    /**********************************************
+     *      Web View Methods
+     *      Called to update
+     */
+
+    public void updateImageWebView(List<Svg> images) {
         wV = (WebView) findViewById(R.id.webView);
         StringBuilder html = new StringBuilder();
         html.append("<html>" +
@@ -142,7 +152,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void newNote(MenuItem item){
+        final Dialog dialog = new Dialog(this);
+        dialog.setContentView(R.layout.new_entry_form);
 
+        Button saveButton = (Button) dialog.findViewById(R.id.new_entry_save_button);
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+
+        dialog.show();
     }
 
     public void viewNotes(MenuItem item){
