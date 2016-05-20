@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Dream Anchor</string>
+    <string name="notes">Notes</string>
+    <string name="action_settings">Settings</string>
+    <string name="refresh">Refresh</string>
+    <string name="new_entry">New Entry</string>
+    <string name="past_entries">Past Entries</string>
 </resources>
