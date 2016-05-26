@@ -1,6 +1,7 @@
 package com.dreamanchor.dreamanchor;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -10,13 +11,29 @@ import android.view.MenuItem;
 import android.view.View;
 import android.webkit.WebView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.lang.reflect.Type;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
 import data.Clipart;
+import data.Note;
+import data.NoteList;
 import data.Payload;
 import data.Svg;
 import retrofit.Callback;
@@ -31,6 +48,9 @@ public class MainActivity extends AppCompatActivity {
     private String imageIds = "";
     private List<Svg> imageUrls = null;
     private WebView wV;
+    private final String NOTE_FILE = "note_file";
+    private List<Note> notes;
+    private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE MMM d, yyyy");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
 
         imageIds = getRandomNumbers();
         getRandomClipArt(imageIds);
+        readNoteFile(NOTE_FILE);
     }
 
     @Override
@@ -121,6 +142,22 @@ public class MainActivity extends AppCompatActivity {
      *      Called to update
      */
 
+    private String dreamLogCss(){
+        StringBuilder css = new StringBuilder();
+
+        css.append(
+                "<style>" +
+                    "body{width: 95%;}" +
+                    ".container{padding: 20px; width:100%;}" +
+                    ".page-head{margin-left:auto; margin-right:auto;}" +
+                    ".title{}" +
+                    ".log-entries{margin:10px;}"        +
+                "</style>"
+        );
+
+        return css.toString();
+    }
+
     public void updateImageWebView(List<Svg> images) {
         wV = (WebView) findViewById(R.id.webView);
         StringBuilder html = new StringBuilder();
@@ -134,6 +171,43 @@ public class MainActivity extends AppCompatActivity {
             html.append(imageTag);
         }
         html.append("</div></body></html>");
+        wV.invalidate();
+        wV.setInitialScale(1);
+        wV.getSettings().setLoadWithOverviewMode(true);
+        wV.getSettings().setUseWideViewPort(true);
+        wV.getSettings().setJavaScriptEnabled(true);
+        wV.loadDataWithBaseURL("", html.toString(), "text/html", "utf-8", "");
+    }
+
+    public void viewNotesWebView(){
+        wV = (WebView) findViewById(R.id.webView);
+        StringBuilder html = new StringBuilder();
+        html.append(
+           "<html>" +
+                   "<head>" +
+                        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+        html.append(dreamLogCss());
+        html.append(
+                   "</head>" +
+                    "<body>" +
+                        "<div class='container'>" +
+                   "        <div class='page-head'>" +
+                           "    <div class='title'>" +
+                   "                <center><h1>Dream Log</h1></center>" +
+                           "    </div>" +
+                   "        </div>" +
+                   "        <div class='log-entries'>"
+        );
+        List<Note> notes = NoteList.getInstance();
+        for(Iterator<Note> iterator = notes.iterator();  iterator.hasNext();){
+            Note note = iterator.next();
+            html.append("<dl>" +
+                    "       <dt><h3>"+DATE_FORMAT.format(note.date)+"</h3></dt>" +
+                    "       <dd><b>" + note.title + "</b></dd>" +
+                    "       <dd><p>"+ note.entry + "</p></dd>" +
+                    "   </dl>");
+        }
+        html.append("</div></div></body></html>");
         wV.invalidate();
         wV.setInitialScale(1);
         wV.getSettings().setLoadWithOverviewMode(true);
@@ -159,6 +233,26 @@ public class MainActivity extends AppCompatActivity {
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                EditText titleText = (EditText) dialog.findViewById(R.id.titleText);
+                EditText descText = (EditText) dialog.findViewById(R.id.descText);
+                Date date = new Date();
+                String title = titleText.getText().toString();
+                String desc = descText.getText().toString();
+                if(title.trim().length() > 0 && desc.trim().length() > 0){
+                    Note note = new Note(date, title, desc);
+                    NoteList.getInstance().add(0, note);
+                    appendFile(NOTE_FILE, NoteList.getInstance());
+                    dialog.dismiss();
+                    viewNotesWebView();
+                }else if(title.trim().length() == 0){
+                    titleText.setError("Please add a title.");
+                }else descText.setError("Please describe your dream.");
+            }
+        });
+        Button cancelButton = (Button)dialog.findViewById(R.id.new_entry_cancel_button);
+        cancelButton.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v){
                 dialog.dismiss();
             }
         });
@@ -167,6 +261,50 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void viewNotes(MenuItem item){
-
+        viewNotesWebView();
     }
+
+
+    /**********************************************
+    ** Methods for appending and reading notes file
+     *********************************************/
+    public String objectToJson(Object obj) {
+        Gson gson = new Gson();
+        return gson.toJson(obj);
+    }
+
+    public void appendFile(String title, Object obj) {
+        String filename = title;
+        FileOutputStream oS;
+        String json = objectToJson(obj);
+        try {
+            oS = this.openFileOutput(filename, Context.MODE_PRIVATE);
+            oS.write(json.getBytes());
+            oS.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        }
+    }
+
+    public void readNoteFile(String title){
+        String filePath = this.getFilesDir() + "/" + title;
+        File noteFile = new File(filePath);
+        Gson gson = new Gson();
+
+        Type classType = new TypeToken<List<Note>>(){}.getType();
+        try{
+            NoteList.getInstance().clear();
+            BufferedReader br = new BufferedReader(new FileReader(noteFile));
+            List<Note> notes = gson.fromJson(br, classType);
+            for(Note note : notes){
+                NoteList.getInstance().add(note);
+            }
+
+        }catch(Exception e){
+
+        }
+    }
+
 }
